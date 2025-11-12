@@ -1,6 +1,6 @@
 //go:build !windows
 
-package cmd_test
+package xcmd_test
 
 import (
 	"bytes"
@@ -12,16 +12,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-cmd/cmd"
 	"github.com/go-test/deep"
+	"github.com/kumose/xcmd"
 )
 
 func TestCmdOK(t *testing.T) {
 	now := time.Now().Unix()
 
-	p := cmd.NewCmd("echo", "foo")
+	p := xcmd.NewCmd("echo", "foo")
 	gotStatus := <-p.Start()
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "echo",
 		PID:      gotStatus.PID, // nondeterministic
 		Complete: true,
@@ -51,10 +51,10 @@ func TestCmdOK(t *testing.T) {
 }
 
 func TestCmdClone(t *testing.T) {
-	opt := cmd.Options{
+	opt := xcmd.Options{
 		Buffered: true,
 	}
-	c1 := cmd.NewCmdOptions(opt, "ls")
+	c1 := xcmd.NewCmdOptions(opt, "ls")
 	c1.Dir = "/tmp/"
 	c1.Env = []string{"YES=please"}
 	c2 := c1.Clone()
@@ -71,9 +71,9 @@ func TestCmdClone(t *testing.T) {
 }
 
 func TestCmdNonzeroExit(t *testing.T) {
-	p := cmd.NewCmd("false")
+	p := xcmd.NewCmd("false")
 	gotStatus := <-p.Start()
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "false",
 		PID:      gotStatus.PID, // nondeterministic
 		Complete: true,
@@ -101,7 +101,7 @@ func TestCmdStop(t *testing.T) {
 	// to kill the proc right after count "1" to ensure Stdout only contains "1"
 	// and also to ensure that the proc is really killed instantly because if
 	// it's not then timeout below will trigger.
-	p := cmd.NewCmd("./test/count-and-sleep", "3", "5")
+	p := xcmd.NewCmd("./test/count-and-sleep", "3", "5")
 
 	// Start process in bg and get chan to receive final Status when done
 	statusChan := p.Start()
@@ -117,7 +117,7 @@ func TestCmdStop(t *testing.T) {
 
 	// The final status should be returned instantly
 	timeout := time.After(1 * time.Second)
-	var gotStatus cmd.Status
+	var gotStatus xcmd.Status
 	select {
 	case gotStatus = <-statusChan:
 	case <-timeout:
@@ -133,7 +133,7 @@ func TestCmdStop(t *testing.T) {
 	gotStatus.StartTs = 0
 	gotStatus.StopTs = 0
 
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "./test/count-and-sleep",
 		PID:      gotStatus.PID,                    // nondeterministic
 		Complete: false,                            // signaled by Stop
@@ -168,10 +168,10 @@ func TestCmdStop(t *testing.T) {
 
 func TestCmdNotStarted(t *testing.T) {
 	// Call everything _but_ Start.
-	p := cmd.NewCmd("echo", "foo")
+	p := xcmd.NewCmd("echo", "foo")
 
 	gotStatus := p.Status()
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "echo",
 		PID:      0,
 		Complete: false,
@@ -186,13 +186,13 @@ func TestCmdNotStarted(t *testing.T) {
 	}
 
 	err := p.Stop()
-	if err != cmd.ErrNotStarted {
+	if err != xcmd.ErrNotStarted {
 		t.Error(err)
 	}
 }
 
 func TestCmdOutput(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("", "cmd.TestCmdOutput")
+	tmpfile, err := ioutil.TempFile("", "xcmd.TestCmdOutput")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestCmdOutput(t *testing.T) {
 	t.Logf("temp file: %s", tmpfile.Name())
 	os.Remove(tmpfile.Name())
 
-	p := cmd.NewCmd("./test/touch-file-count", tmpfile.Name())
+	p := xcmd.NewCmd("./test/touch-file-count", tmpfile.Name())
 
 	p.Start()
 
@@ -213,7 +213,7 @@ func TestCmdOutput(t *testing.T) {
 		}
 		time.Sleep(600 * time.Millisecond)
 	}
-	var s cmd.Status
+	var s xcmd.Status
 	var stdout []string
 
 	touchFile(tmpfile.Name())
@@ -257,11 +257,11 @@ func TestCmdOutput(t *testing.T) {
 }
 
 func TestCmdNotFound(t *testing.T) {
-	p := cmd.NewCmd("cmd-does-not-exist")
+	p := xcmd.NewCmd("cmd-does-not-exist")
 	gotStatus := <-p.Start()
 	gotStatus.StartTs = 0
 	gotStatus.StopTs = 0
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "cmd-does-not-exist",
 		PID:      0,
 		Complete: false,
@@ -281,7 +281,7 @@ func TestCmdNotFound(t *testing.T) {
 func TestCmdLost(t *testing.T) {
 	// Test something like the kernel OOM killing the proc. So the proc is
 	// stopped outside our control.
-	p := cmd.NewCmd("./test/count-and-sleep", "3", "5")
+	p := xcmd.NewCmd("./test/count-and-sleep", "3", "5")
 
 	statusChan := p.Start()
 
@@ -301,7 +301,7 @@ func TestCmdLost(t *testing.T) {
 
 	// Even though killed externally, our wait should return instantly
 	timeout := time.After(1 * time.Second)
-	var gotStatus cmd.Status
+	var gotStatus xcmd.Status
 	select {
 	case gotStatus = <-statusChan:
 	case <-timeout:
@@ -311,7 +311,7 @@ func TestCmdLost(t *testing.T) {
 	gotStatus.StartTs = 0
 	gotStatus.StopTs = 0
 
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "./test/count-and-sleep",
 		PID:      s.PID,
 		Complete: false,
@@ -328,7 +328,7 @@ func TestCmdLost(t *testing.T) {
 }
 
 func TestCmdBothOutput(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("", "cmd.TestStreamingOutput")
+	tmpfile, err := ioutil.TempFile("", "xcmd.TestStreamingOutput")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func TestCmdBothOutput(t *testing.T) {
 	//   stdout 2
 	//   stderr 2
 	// Where each is printed on stdout and stderr as indicated.
-	p := cmd.NewCmdOptions(cmd.Options{Buffered: true, CombinedOutput: false, Streaming: true}, "./test/stream", tmpfile.Name())
+	p := xcmd.NewCmdOptions(xcmd.Options{Buffered: true, CombinedOutput: false, Streaming: true}, "./test/stream", tmpfile.Name())
 	p.Start()
 	time.Sleep(250 * time.Millisecond) // give test/stream a moment to print something
 
@@ -439,7 +439,7 @@ func TestCmdBothOutput(t *testing.T) {
 }
 
 func TestCmdCombinedOutputOnly(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("", "cmd.TestCmdCombinedOutputOnly")
+	tmpfile, err := ioutil.TempFile("", "xcmd.TestCmdCombinedOutputOnly")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -450,7 +450,7 @@ func TestCmdCombinedOutputOnly(t *testing.T) {
 	t.Logf("temp file: %s", tmpfile.Name())
 	os.Remove(tmpfile.Name())
 
-	p := cmd.NewCmdOptions(cmd.Options{Buffered: false, CombinedOutput: true, Streaming: false}, "./test/touch-file-count-combined", tmpfile.Name())
+	p := xcmd.NewCmdOptions(xcmd.Options{Buffered: false, CombinedOutput: true, Streaming: false}, "./test/touch-file-count-combined", tmpfile.Name())
 
 	p.Start()
 
@@ -460,9 +460,9 @@ func TestCmdCombinedOutputOnly(t *testing.T) {
 		}
 		time.Sleep(600 * time.Millisecond)
 	}
-	var s cmd.Status
+	var s xcmd.Status
 	var stdout []string
-	var stderr []string //creating nil slice and cmd.Stderr should always be nil in combined
+	var stderr []string //creating nil slice and xcmd.Stderr should always be nil in combined
 
 	touchFile(tmpfile.Name())
 	s = p.Status()
@@ -526,7 +526,7 @@ func TestCmdCombinedOutputOnly(t *testing.T) {
 func TestCmdBothCombinedStreamOutput(t *testing.T) {
 	//This tests the buffered combined
 
-	tmpfile, err := ioutil.TempFile("", "cmd.TestCombinedOutput")
+	tmpfile, err := ioutil.TempFile("", "xcmd.TestCombinedOutput")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,7 +552,7 @@ func TestCmdBothCombinedStreamOutput(t *testing.T) {
 	//   stdout 2
 	//   stderr 2
 	// Where each is printed on stdout and stderr as indicated.
-	p := cmd.NewCmdOptions(cmd.Options{Buffered: false, CombinedOutput: true, Streaming: true}, "./test/stream", tmpfile.Name())
+	p := xcmd.NewCmdOptions(xcmd.Options{Buffered: false, CombinedOutput: true, Streaming: true}, "./test/stream", tmpfile.Name())
 	p.Start()
 	time.Sleep(250 * time.Millisecond) // give test/stream a moment to print something
 
@@ -639,7 +639,7 @@ func TestCmdBothCombinedStreamOutput(t *testing.T) {
 }
 
 func TestCmdOnlyStreamingOutput(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("", "cmd.TestStreamingOutput")
+	tmpfile, err := ioutil.TempFile("", "xcmd.TestStreamingOutput")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -665,7 +665,7 @@ func TestCmdOnlyStreamingOutput(t *testing.T) {
 	//   stdout 2
 	//   stderr 2
 	// Where each is printed on stdout and stderr as indicated.
-	p := cmd.NewCmdOptions(cmd.Options{Buffered: false, CombinedOutput: false, Streaming: true}, "./test/stream", tmpfile.Name())
+	p := xcmd.NewCmdOptions(xcmd.Options{Buffered: false, CombinedOutput: false, Streaming: true}, "./test/stream", tmpfile.Name())
 	p.Start()
 	time.Sleep(250 * time.Millisecond) // give test/stream a moment to print something
 
@@ -752,7 +752,7 @@ func TestCmdOnlyStreamingOutput(t *testing.T) {
 
 func TestStreamingMultipleLines(t *testing.T) {
 	lines := make(chan string, 5)
-	out := cmd.NewOutputStream(lines)
+	out := xcmd.NewOutputStream(lines)
 
 	// Quick side test: Lines() chan string should be the same chan string
 	// we created the object with
@@ -797,9 +797,9 @@ func TestStreamingMultipleLines(t *testing.T) {
 
 func TestStreamingMultipleLinesLastNotTerminated(t *testing.T) {
 	// If last line isn't \n terminated, go-cmd should flush it anyway
-	// https://github.com/go-cmd/cmd/pull/48
+	// https://github.com/kumose/xcmd/pull/48
 	lines := make(chan string, 5)
-	out := cmd.NewOutputStream(lines)
+	out := xcmd.NewOutputStream(lines)
 
 	// Quick side test: Lines() chan string should be the same chan string
 	// we created the object with
@@ -846,7 +846,7 @@ func TestStreamingMultipleLinesLastNotTerminated(t *testing.T) {
 
 func TestStreamingBlankLines(t *testing.T) {
 	lines := make(chan string, 5)
-	out := cmd.NewOutputStream(lines)
+	out := xcmd.NewOutputStream(lines)
 
 	// Blank line in the middle
 	input := "foo\n\nbar\n"
@@ -924,7 +924,7 @@ LINES3:
 func TestStreamingCarriageReturn(t *testing.T) {
 	// Carriage return should be stripped
 	lines := make(chan string, 5)
-	out := cmd.NewOutputStream(lines)
+	out := xcmd.NewOutputStream(lines)
 
 	input := "foo\r\nbar\r\n"
 	expectLines := []string{"foo", "bar"}
@@ -955,7 +955,7 @@ func TestStreamingLineBuffering(t *testing.T) {
 	// write. When line is later terminated with newline, we prepend the buffered
 	// line and send the complete line.
 	lines := make(chan string, 1)
-	out := cmd.NewOutputStream(lines)
+	out := xcmd.NewOutputStream(lines)
 
 	// Write 3 unterminated lines. Without a newline, they'll be buffered until...
 	for i := 0; i < 3; i++ {
@@ -1006,19 +1006,19 @@ func TestStreamingErrLineBufferOverflow1(t *testing.T) {
 	// Overflow the line buffer in 1 write. The first line "bc" is sent,
 	// but the remaining line can't be buffered because it's +2 bytes larger
 	// than the line buffer.
-	longLine := make([]byte, 3+cmd.DEFAULT_LINE_BUFFER_SIZE+2) // "bc\nAAA...zz"
+	longLine := make([]byte, 3+xcmd.DEFAULT_LINE_BUFFER_SIZE+2) // "bc\nAAA...zz"
 	longLine[0] = 'b'
 	longLine[1] = 'c'
 	longLine[2] = '\n'
-	for i := 3; i < cmd.DEFAULT_LINE_BUFFER_SIZE; i++ {
+	for i := 3; i < xcmd.DEFAULT_LINE_BUFFER_SIZE; i++ {
 		longLine[i] = 'A'
 	}
 	// These 2 chars cause ErrLineBufferOverflow:
-	longLine[cmd.DEFAULT_LINE_BUFFER_SIZE] = 'z'
-	longLine[cmd.DEFAULT_LINE_BUFFER_SIZE+1] = 'z'
+	longLine[xcmd.DEFAULT_LINE_BUFFER_SIZE] = 'z'
+	longLine[xcmd.DEFAULT_LINE_BUFFER_SIZE+1] = 'z'
 
 	lines := make(chan string, 5)
-	out := cmd.NewOutputStream(lines)
+	out := xcmd.NewOutputStream(lines)
 
 	// Write the long line, it should only write (n) 3 bytes for "bc\n"
 	n, err := out.Write(longLine)
@@ -1026,13 +1026,13 @@ func TestStreamingErrLineBufferOverflow1(t *testing.T) {
 		t.Errorf("Write n = %d, expected 3", n)
 	}
 	switch err.(type) {
-	case cmd.ErrLineBufferOverflow:
-		lbo := err.(cmd.ErrLineBufferOverflow)
-		if lbo.BufferSize != cmd.DEFAULT_LINE_BUFFER_SIZE {
-			t.Errorf("ErrLineBufferOverflow.BufferSize = %d, expected %d", lbo.BufferSize, cmd.DEFAULT_LINE_BUFFER_SIZE)
+	case xcmd.ErrLineBufferOverflow:
+		lbo := err.(xcmd.ErrLineBufferOverflow)
+		if lbo.BufferSize != xcmd.DEFAULT_LINE_BUFFER_SIZE {
+			t.Errorf("ErrLineBufferOverflow.BufferSize = %d, expected %d", lbo.BufferSize, xcmd.DEFAULT_LINE_BUFFER_SIZE)
 		}
-		if lbo.BufferFree != cmd.DEFAULT_LINE_BUFFER_SIZE {
-			t.Errorf("ErrLineBufferOverflow.BufferFree = %d, expected %d", lbo.BufferFree, cmd.DEFAULT_LINE_BUFFER_SIZE)
+		if lbo.BufferFree != xcmd.DEFAULT_LINE_BUFFER_SIZE {
+			t.Errorf("ErrLineBufferOverflow.BufferFree = %d, expected %d", lbo.BufferFree, xcmd.DEFAULT_LINE_BUFFER_SIZE)
 		}
 		if lbo.Line != string(longLine[3:]) {
 			t.Errorf("ErrLineBufferOverflow.Line = '%s', expected '%s'", lbo.Line, string(longLine[3:]))
@@ -1041,7 +1041,7 @@ func TestStreamingErrLineBufferOverflow1(t *testing.T) {
 			t.Errorf("ErrLineBufferOverflow.Error() string is empty, expected something")
 		}
 	default:
-		t.Errorf("got err '%v', expected cmd.ErrLineBufferOverflow", err)
+		t.Errorf("got err '%v', expected xcmd.ErrLineBufferOverflow", err)
 	}
 
 	// "bc" should be sent before the overflow error
@@ -1079,7 +1079,7 @@ func TestStreamingErrLineBufferOverflow2(t *testing.T) {
 	// Overflow line buffer on 2nd write. So first write puts something in the
 	// buffer, and then 2nd overflows it instead of completing the line.
 	lines := make(chan string, 1)
-	out := cmd.NewOutputStream(lines)
+	out := xcmd.NewOutputStream(lines)
 
 	// Get "bar" into the buffer by omitting its newline
 	input := "foo\nbar"
@@ -1103,8 +1103,8 @@ func TestStreamingErrLineBufferOverflow2(t *testing.T) {
 	}
 
 	// Buffer contains "bar", now wverflow it on 2nd write
-	longLine := make([]byte, cmd.DEFAULT_LINE_BUFFER_SIZE)
-	for i := 0; i < cmd.DEFAULT_LINE_BUFFER_SIZE; i++ {
+	longLine := make([]byte, xcmd.DEFAULT_LINE_BUFFER_SIZE)
+	for i := 0; i < xcmd.DEFAULT_LINE_BUFFER_SIZE; i++ {
 		longLine[i] = 'X'
 	}
 	n, err = out.Write(longLine)
@@ -1112,11 +1112,11 @@ func TestStreamingErrLineBufferOverflow2(t *testing.T) {
 		t.Errorf("Write n = %d, expected 0", n)
 	}
 	switch err.(type) {
-	case cmd.ErrLineBufferOverflow:
-		lbo := err.(cmd.ErrLineBufferOverflow)
+	case xcmd.ErrLineBufferOverflow:
+		lbo := err.(xcmd.ErrLineBufferOverflow)
 		// Buffer has "bar" so it's free is total - 3
-		if lbo.BufferFree != cmd.DEFAULT_LINE_BUFFER_SIZE-3 {
-			t.Errorf("ErrLineBufferOverflow.BufferFree = %d, expected %d", lbo.BufferFree, cmd.DEFAULT_LINE_BUFFER_SIZE)
+		if lbo.BufferFree != xcmd.DEFAULT_LINE_BUFFER_SIZE-3 {
+			t.Errorf("ErrLineBufferOverflow.BufferFree = %d, expected %d", lbo.BufferFree, xcmd.DEFAULT_LINE_BUFFER_SIZE)
 		}
 		// Up to but not include "bc\n" because it should have been truncated
 		expectLine := "bar" + string(longLine)
@@ -1124,7 +1124,7 @@ func TestStreamingErrLineBufferOverflow2(t *testing.T) {
 			t.Errorf("ErrLineBufferOverflow.Line = '%s', expected '%s'", lbo.Line, expectLine)
 		}
 	default:
-		t.Errorf("got err '%v', expected cmd.ErrLineBufferOverflow", err)
+		t.Errorf("got err '%v', expected xcmd.ErrLineBufferOverflow", err)
 	}
 }
 
@@ -1132,19 +1132,19 @@ func TestStreamingSetLineBufferSize(t *testing.T) {
 	// Same overflow as TestStreamingErrLineBufferOverflow1 but before we use
 	// stream output, we'll increase buffer size by calling SetLineBufferSize
 	// which should prevent the overflow
-	longLine := make([]byte, 3+cmd.DEFAULT_LINE_BUFFER_SIZE+2) // "bc\nAAA...z\n"
+	longLine := make([]byte, 3+xcmd.DEFAULT_LINE_BUFFER_SIZE+2) // "bc\nAAA...z\n"
 	longLine[0] = 'b'
 	longLine[1] = 'c'
 	longLine[2] = '\n'
-	for i := 3; i < cmd.DEFAULT_LINE_BUFFER_SIZE; i++ {
+	for i := 3; i < xcmd.DEFAULT_LINE_BUFFER_SIZE; i++ {
 		longLine[i] = 'A'
 	}
-	longLine[cmd.DEFAULT_LINE_BUFFER_SIZE] = 'z'
-	longLine[cmd.DEFAULT_LINE_BUFFER_SIZE+1] = '\n'
+	longLine[xcmd.DEFAULT_LINE_BUFFER_SIZE] = 'z'
+	longLine[xcmd.DEFAULT_LINE_BUFFER_SIZE+1] = '\n'
 
 	lines := make(chan string, 5)
-	out := cmd.NewOutputStream(lines)
-	out.SetLineBufferSize(cmd.DEFAULT_LINE_BUFFER_SIZE * 2)
+	out := xcmd.NewOutputStream(lines)
+	out.SetLineBufferSize(xcmd.DEFAULT_LINE_BUFFER_SIZE * 2)
 
 	n, err := out.Write(longLine)
 	if err != nil {
@@ -1171,7 +1171,7 @@ func TestStreamingSetLineBufferSize(t *testing.T) {
 	default:
 		t.Fatal("blocked on <-lines")
 	}
-	expectLine := string(longLine[3 : cmd.DEFAULT_LINE_BUFFER_SIZE+1]) // not newline
+	expectLine := string(longLine[3 : xcmd.DEFAULT_LINE_BUFFER_SIZE+1]) // not newline
 	if gotLine != expectLine {
 		t.Errorf("got line: '%s', expected '%s'", gotLine, expectLine)
 	}
@@ -1179,7 +1179,7 @@ func TestStreamingSetLineBufferSize(t *testing.T) {
 
 func TestDone(t *testing.T) {
 	// Count to 3 sleeping 1s between counts
-	p := cmd.NewCmd("./test/count-and-sleep", "3", "1")
+	p := xcmd.NewCmd("./test/count-and-sleep", "3", "1")
 	statusChan := p.Start()
 
 	// For 2s while cmd is running, Done() chan should block, which means
@@ -1202,7 +1202,7 @@ TIMER:
 	}
 
 	// Wait for cmd to complete
-	var s1 cmd.Status
+	var s1 xcmd.Status
 	select {
 	case s1 = <-statusChan:
 		t.Logf("got status: %+v", s1)
@@ -1228,10 +1228,10 @@ TIMER:
 func TestCmdEnvOK(t *testing.T) {
 	now := time.Now().Unix()
 
-	p := cmd.NewCmd("env")
+	p := xcmd.NewCmd("env")
 	p.Env = []string{"FOO=foo"}
 	gotStatus := <-p.Start()
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "env",
 		PID:      gotStatus.PID, // nondeterministic
 		Complete: true,
@@ -1262,8 +1262,8 @@ func TestCmdEnvOK(t *testing.T) {
 
 func TestCmdNoOutput(t *testing.T) {
 	// Set both output options to false to discard all output
-	p := cmd.NewCmdOptions(
-		cmd.Options{
+	p := xcmd.NewCmdOptions(
+		xcmd.Options{
 			Buffered:  false,
 			Streaming: false,
 		},
@@ -1297,9 +1297,9 @@ func TestStdinOk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		now := time.Now().Unix()
-		p := cmd.NewCmd("test/stdin")
+		p := xcmd.NewCmd("test/stdin")
 		gotStatus := <-p.StartWithStdin(bytes.NewReader(tt.in))
-		expectStatus := cmd.Status{
+		expectStatus := xcmd.Status{
 			Cmd:      "test/stdin",
 			PID:      gotStatus.PID, // nondeterministic
 			Complete: true,
@@ -1331,8 +1331,8 @@ func TestStdinOk(t *testing.T) {
 
 func TestOptionsBeforeExec(t *testing.T) {
 	handled := false
-	p := cmd.NewCmdOptions(
-		cmd.Options{
+	p := xcmd.NewCmdOptions(
+		xcmd.Options{
 			BeforeExec: []func(cmd *exec.Cmd){
 				func(cmd *exec.Cmd) { handled = true },
 			},
@@ -1346,8 +1346,8 @@ func TestOptionsBeforeExec(t *testing.T) {
 
 	// nil funcs should be ignored, not cause a panic
 	handled = false
-	p = cmd.NewCmdOptions(
-		cmd.Options{
+	p = xcmd.NewCmdOptions(
+		xcmd.Options{
 			BeforeExec: []func(cmd *exec.Cmd){
 				nil,
 				func(cmd *exec.Cmd) { handled = true },
@@ -1370,13 +1370,13 @@ func TestOptionsBeforeExec(t *testing.T) {
 }
 
 func TestOptionsBeforeExecButStopped(t *testing.T) {
-	// https://github.com/go-cmd/cmd/issues/94
+	// https://github.com/kumose/xcmd/issues/94
 	// Bug: if cmd is stopped before BeforeExec completes, cmd still runs.
 	// To test, call Stop before BeforeExec callbacks are done and make sure
 	// the cmd is not run.
 	called := make(chan bool)
-	p := cmd.NewCmdOptions(
-		cmd.Options{
+	p := xcmd.NewCmdOptions(
+		xcmd.Options{
 			CombinedOutput: true,
 			BeforeExec: []func(cmd *exec.Cmd){
 				func(cmd *exec.Cmd) {
@@ -1395,12 +1395,12 @@ func TestOptionsBeforeExecButStopped(t *testing.T) {
 	}
 
 	err := p.Stop()
-	if err != cmd.ErrNotStarted {
-		t.Errorf("got err %v, expected cmd.ErrNotStarted", err)
+	if err != xcmd.ErrNotStarted {
+		t.Errorf("got err %v, expected xcmd.ErrNotStarted", err)
 	}
 	close(called) // unblock BeforeExec func
 
-	var got cmd.Status
+	var got xcmd.Status
 	select {
 	case got = <-statusChan:
 	case <-time.After(2 * time.Second):
@@ -1421,13 +1421,13 @@ func TestOptionsBeforeExecButStopped(t *testing.T) {
 }
 
 func TestCmdLineBufferIncrease(t *testing.T) {
-	lineContent := cmd.DEFAULT_LINE_BUFFER_SIZE * 2
+	lineContent := xcmd.DEFAULT_LINE_BUFFER_SIZE * 2
 	longLine := make([]byte, lineContent) // "AAA..."
 	for i := 0; i < lineContent; i++ {
 		longLine[i] = 'A'
 	}
 
-	tmpfile, err := ioutil.TempFile("", "cmd.TestCmdLineBufferIncrease")
+	tmpfile, err := ioutil.TempFile("", "xcmd.TestCmdLineBufferIncrease")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1443,9 +1443,9 @@ func TestCmdLineBufferIncrease(t *testing.T) {
 
 	timeout := time.After(10 * time.Second) // test timeout
 
-	catStdout := cmd.NewCmdOptions(cmd.Options{
+	catStdout := xcmd.NewCmdOptions(xcmd.Options{
 		Streaming:      true,
-		LineBufferSize: cmd.DEFAULT_LINE_BUFFER_SIZE * 2,
+		LineBufferSize: xcmd.DEFAULT_LINE_BUFFER_SIZE * 2,
 	}, "./test/cat", tmpfile.Name(), "1")
 
 	catStdoutStatus := catStdout.Start()
@@ -1453,7 +1453,7 @@ func TestCmdLineBufferIncrease(t *testing.T) {
 	select {
 	case curLine := <-catStdout.Stdout:
 		t.Logf("got stdout bytes: %d", len(curLine))
-		if len(curLine) <= cmd.DEFAULT_LINE_BUFFER_SIZE {
+		if len(curLine) <= xcmd.DEFAULT_LINE_BUFFER_SIZE {
 			t.Error("Unable to read more than default line buffer from stdout")
 		}
 	case <-timeout:
@@ -1461,9 +1461,9 @@ func TestCmdLineBufferIncrease(t *testing.T) {
 	}
 	<-catStdoutStatus
 
-	catStderr := cmd.NewCmdOptions(cmd.Options{
+	catStderr := xcmd.NewCmdOptions(xcmd.Options{
 		Streaming:      true,
-		LineBufferSize: cmd.DEFAULT_LINE_BUFFER_SIZE * 2,
+		LineBufferSize: xcmd.DEFAULT_LINE_BUFFER_SIZE * 2,
 	}, "./test/cat", tmpfile.Name(), "2")
 
 	catStderrStatus := catStderr.Start()
@@ -1471,7 +1471,7 @@ func TestCmdLineBufferIncrease(t *testing.T) {
 	select {
 	case curLine := <-catStderr.Stderr:
 		t.Logf("got stderr bytes: %d", len(curLine))
-		if len(curLine) <= cmd.DEFAULT_LINE_BUFFER_SIZE {
+		if len(curLine) <= xcmd.DEFAULT_LINE_BUFFER_SIZE {
 			t.Error("Unable to read more than default line buffer from stderr")
 		}
 	case <-timeout:

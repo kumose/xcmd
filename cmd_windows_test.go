@@ -1,6 +1,6 @@
 //go:build windows
 
-package cmd_test
+package xcmd_test
 
 import (
 	"errors"
@@ -11,16 +11,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-cmd/cmd"
+	"github.com/kumose/xcmd"
 	"github.com/go-test/deep"
 )
 
 func TestCmdOK(t *testing.T) {
 	now := time.Now().Unix()
 
-	p := cmd.NewCmd("echo", "foo")
+	p := xcmd.NewCmd("echo", "foo")
 	gotStatus := <-p.Start()
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "echo",
 		PID:      gotStatus.PID, // nondeterministic
 		Complete: true,
@@ -50,10 +50,10 @@ func TestCmdOK(t *testing.T) {
 }
 
 func TestCmdClone(t *testing.T) {
-	opt := cmd.Options{
+	opt := xcmd.Options{
 		Buffered: true,
 	}
-	c1 := cmd.NewCmdOptions(opt, "ls")
+	c1 := xcmd.NewCmdOptions(opt, "ls")
 	c1.Dir = "/tmp/"
 	c1.Env = []string{"YES=please"}
 	c2 := c1.Clone()
@@ -70,9 +70,9 @@ func TestCmdClone(t *testing.T) {
 }
 
 func TestCmdNonzeroExit(t *testing.T) {
-	p := cmd.NewCmd("false")
+	p := xcmd.NewCmd("false")
 	gotStatus := <-p.Start()
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "false",
 		PID:      gotStatus.PID, // nondeterministic
 		Complete: true,
@@ -96,7 +96,7 @@ func TestCmdNonzeroExit(t *testing.T) {
 }
 
 func TestCmdStop(t *testing.T) {
-	p := cmd.NewCmd("sleep", "5")
+	p := xcmd.NewCmd("sleep", "5")
 
 	// Start process in bg and get chan to receive final Status when done
 	statusChan := p.Start()
@@ -112,7 +112,7 @@ func TestCmdStop(t *testing.T) {
 
 	// The final status should be returned instantly
 	timeout := time.After(1 * time.Second)
-	var gotStatus cmd.Status
+	var gotStatus xcmd.Status
 	select {
 	case gotStatus = <-statusChan:
 	case <-timeout:
@@ -128,7 +128,7 @@ func TestCmdStop(t *testing.T) {
 	gotStatus.StartTs = 0
 	gotStatus.StopTs = 0
 
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "sleep",
 		PID:      gotStatus.PID, // nondeterministic
 		Complete: false,
@@ -163,10 +163,10 @@ func TestCmdStop(t *testing.T) {
 
 func TestCmdNotStarted(t *testing.T) {
 	// Call everything _but_ Start.
-	p := cmd.NewCmd("echo", "foo")
+	p := xcmd.NewCmd("echo", "foo")
 
 	gotStatus := p.Status()
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "echo",
 		PID:      0,
 		Complete: false,
@@ -181,7 +181,7 @@ func TestCmdNotStarted(t *testing.T) {
 	}
 
 	err := p.Stop()
-	if err != cmd.ErrNotStarted {
+	if err != xcmd.ErrNotStarted {
 		t.Error(err)
 	}
 }
@@ -189,7 +189,7 @@ func TestCmdNotStarted(t *testing.T) {
 func TestCmdOutput(t *testing.T) {
 	t.Skip("FIXME")
 
-	tmpfile, err := ioutil.TempFile("", "cmd.TestCmdOutput")
+	tmpfile, err := ioutil.TempFile("", "xcmd.TestCmdOutput")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestCmdOutput(t *testing.T) {
 	t.Logf("temp file: %s", tmpfile.Name())
 	os.Remove(tmpfile.Name())
 
-	p := cmd.NewCmd(path.Join(".", "test", "touch-file-count"), tmpfile.Name())
+	p := xcmd.NewCmd(path.Join(".", "test", "touch-file-count"), tmpfile.Name())
 
 	p.Start()
 
@@ -210,7 +210,7 @@ func TestCmdOutput(t *testing.T) {
 		}
 		time.Sleep(600 * time.Millisecond)
 	}
-	var s cmd.Status
+	var s xcmd.Status
 	var stdout []string
 
 	touchFile(tmpfile.Name())
@@ -256,11 +256,11 @@ func TestCmdOutput(t *testing.T) {
 func TestCmdNotFound(t *testing.T) {
 	t.Skip("FIXME")
 
-	p := cmd.NewCmd("cmd-does-not-exist")
+	p := xcmd.NewCmd("cmd-does-not-exist")
 	gotStatus := <-p.Start()
 	gotStatus.StartTs = 0
 	gotStatus.StopTs = 0
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "cmd-does-not-exist",
 		PID:      0,
 		Complete: false,
@@ -280,7 +280,7 @@ func TestDone(t *testing.T) {
 	t.Skip("FIXME")
 
 	// Count to 3 sleeping 1s between counts
-	p := cmd.NewCmd(path.Join(".", "test", "count-and-sleep"), "3", "1")
+	p := xcmd.NewCmd(path.Join(".", "test", "count-and-sleep"), "3", "1")
 	statusChan := p.Start()
 
 	// For 2s while cmd is running, Done() chan should block, which means
@@ -303,7 +303,7 @@ TIMER:
 	}
 
 	// Wait for cmd to complete
-	var s1 cmd.Status
+	var s1 xcmd.Status
 	select {
 	case s1 = <-statusChan:
 		t.Logf("got status: %+v", s1)
@@ -331,10 +331,10 @@ func TestCmdEnvOK(t *testing.T) {
 
 	now := time.Now().Unix()
 
-	p := cmd.NewCmd("env")
+	p := xcmd.NewCmd("env")
 	p.Env = []string{"FOO=foo"}
 	gotStatus := <-p.Start()
-	expectStatus := cmd.Status{
+	expectStatus := xcmd.Status{
 		Cmd:      "env",
 		PID:      gotStatus.PID, // nondeterministic
 		Complete: true,
@@ -365,8 +365,8 @@ func TestCmdEnvOK(t *testing.T) {
 
 func TestCmdNoOutput(t *testing.T) {
 	// Set both output options to false to discard all output
-	p := cmd.NewCmdOptions(
-		cmd.Options{
+	p := xcmd.NewCmdOptions(
+		xcmd.Options{
 			Buffered:  false,
 			Streaming: false,
 		},

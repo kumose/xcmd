@@ -1,7 +1,4 @@
-# go-cmd/Cmd
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/go-cmd/cmd)](https://goreportcard.com/report/github.com/go-cmd/cmd) [![Coverage Status](https://coveralls.io/repos/github/go-cmd/cmd/badge.svg?branch=master)](https://coveralls.io/github/go-cmd/cmd?branch=master)
-[![Go Reference](https://pkg.go.dev/badge/github.com/go-cmd/cmd/.svg)](https://pkg.go.dev/github.com/go-cmd/cmd/)
+# kumose/xcmd
 
 This package is a small but very useful wrapper around [os/exec.Cmd](https://pkg.go.dev/os/exec#Cmd) that makes it safe and simple to run external commands in highly concurrent, asynchronous, real-time applications. It works on Linux, macOS, and Windows. Here's the basic usage:
 
@@ -9,12 +6,12 @@ This package is a small but very useful wrapper around [os/exec.Cmd](https://pkg
 import (
 	"fmt"
 	"time"
-	"github.com/go-cmd/cmd"
+	"github.com/kumose/xcmd"
 )
 
 func main() {
 	// Start a long-running process, capture stdout and stderr
-	findCmd := cmd.NewCmd("find", "/", "--name", "needle")
+	findCmd := xcmd.NewCmd("find", "/", "--name", "needle")
 	statusChan := findCmd.Start() // non-blocking
 
 	ticker := time.NewTicker(2 * time.Second)
@@ -62,7 +59,7 @@ As the example above shows, starting a command immediately returns a channel to 
 
 ```go
 // Run foo and block waiting for it to exit
-c := cmd.NewCmd("foo")
+c := xcmd.NewCmd("foo")
 s := <-c.Start()
 ```
 To achieve similar with `os/exec.Cmd` requires everything this package already does.
@@ -113,4 +110,4 @@ In addition to 100% test coverage and no race conditions, this package is active
 
 ## License
 
-[MIT](LICENSE) © go-Cmd.
+[AGPL](LICENSE) © go-Cmd.

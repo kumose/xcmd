@@ -15,7 +15,7 @@ For security patches, the latest release is supported:
 
 ## Reporting a Vulnerability
 
-To report a vulnerability, [create an issue](https://github.com/go-cmd/cmd/issues) with the _security_ label.
+To report a vulnerability, [create an issue](https://github.com/kumose/xcmd/issues) with the _security_ label.
 
 This project is developed and maintained by volunteers during their free time,
 so there is no SLA or ETA for fixing vulnerabilities (or any issues).

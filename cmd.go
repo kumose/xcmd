@@ -7,12 +7,12 @@
 //
 //	import (
 //	    "fmt"
-//	    "github.com/go-cmd/cmd"
+//	    "github.com/kumose/xcmd"
 //	)
 //
 //	func main() {
 //	    // Create Cmd, buffered output
-//	    envCmd := cmd.NewCmd("env")
+//	    envCmd := xcmd.NewCmd("env")
 //
 //	    // Run and wait for Cmd to return Status
 //	    status := <-envCmd.Start()
@@ -25,7 +25,7 @@
 //
 // Commands can be ran synchronously (blocking) or asynchronously (non-blocking):
 //
-//	envCmd := cmd.NewCmd("env") // create
+//	envCmd := xcmd.NewCmd("env") // create
 //
 //	status := <-envCmd.Start() // run blocking
 //
@@ -39,7 +39,7 @@
 // on it later. Only one final status is sent to the channel; use Done for
 // multiple goroutines to wait for the command to finish, then call Status to
 // get the final status.
-package cmd
+package xcmd
 
 import (
 	"bufio"
@@ -85,7 +85,7 @@ type Cmd struct {
 	Stderr chan string
 
 	*sync.Mutex
-	started         bool      // cmd.Start called, no error
+	started         bool      // xcmd.Start called, no error
 	stopped         bool      // Stop called
 	done            bool      // run() done
 	final           bool      // status finalized in Status
@@ -317,7 +317,7 @@ func (c *Cmd) Stop() error {
 	// Flag that command was stopped, it didn't complete. This results in
 	// status.Complete = false. If beforeExecFuncs are executing (Cmd hasn't
 	// started yet), run will return after the current func returns (fixes
-	// bug https://github.com/go-cmd/cmd/issues/94).
+	// bug https://github.com/kumose/xcmd/issues/94).
 	if c.stopped {
 		return nil
 	}
@@ -341,7 +341,7 @@ func (c *Cmd) Stop() error {
 
 	// Signal the process group (-pid), not just the process, so that the process
 	// and all its children are signaled. Else, child procs can keep running and
-	// keep the stdout/stderr fd open and cause cmd.Wait to hang.
+	// keep the stdout/stderr fd open and cause xcmd.Wait to hang.
 	return terminateProcess(c.status.PID)
 }
 
@@ -417,35 +417,35 @@ func (c *Cmd) run(in io.Reader) {
 	// //////////////////////////////////////////////////////////////////////
 	// Setup command
 	// //////////////////////////////////////////////////////////////////////
-	cmd := exec.Command(c.Name, c.Args...)
+	scmd := exec.Command(c.Name, c.Args...)
 	if in != nil {
-		cmd.Stdin = in
+		scmd.Stdin = in
 	}
 
 	// Platform-specific SysProcAttr management
-	setProcessGroupID(cmd)
+	setProcessGroupID(scmd)
 
 	// Set exec.Cmd.Stdout and .Stderr to our concurrent-safe stdout/stderr
 	// buffer, stream both, or neither
 	switch {
 	case c.stdoutBuf != nil && c.stderrBuf != nil && c.stdoutStream != nil: // buffer and stream
-		cmd.Stdout = io.MultiWriter(c.stdoutStream, c.stdoutBuf)
-		cmd.Stderr = io.MultiWriter(c.stderrStream, c.stderrBuf)
+		scmd.Stdout = io.MultiWriter(c.stdoutStream, c.stdoutBuf)
+		scmd.Stderr = io.MultiWriter(c.stderrStream, c.stderrBuf)
 	case c.stdoutBuf != nil && c.stderrBuf == nil && c.stdoutStream != nil: // combined buffer and stream
-		cmd.Stdout = io.MultiWriter(c.stdoutStream, c.stdoutBuf)
-		cmd.Stderr = io.MultiWriter(c.stderrStream, c.stdoutBuf)
+		scmd.Stdout = io.MultiWriter(c.stdoutStream, c.stdoutBuf)
+		scmd.Stderr = io.MultiWriter(c.stderrStream, c.stdoutBuf)
 	case c.stdoutBuf != nil && c.stderrBuf != nil: // buffer only
-		cmd.Stdout = c.stdoutBuf
-		cmd.Stderr = c.stderrBuf
+		scmd.Stdout = c.stdoutBuf
+		scmd.Stderr = c.stderrBuf
 	case c.stdoutBuf != nil && c.stderrBuf == nil: // buffer combining stderr into stdout
-		cmd.Stdout = c.stdoutBuf
-		cmd.Stderr = c.stdoutBuf
+		scmd.Stdout = c.stdoutBuf
+		scmd.Stderr = c.stdoutBuf
 	case c.stdoutStream != nil: // stream only
-		cmd.Stdout = c.stdoutStream
-		cmd.Stderr = c.stderrStream
+		scmd.Stdout = c.stdoutStream
+		scmd.Stderr = c.stderrStream
 	default: // no output (cmd >/dev/null 2>&1)
-		cmd.Stdout = nil
-		cmd.Stderr = nil
+		scmd.Stdout = nil
+		scmd.Stderr = nil
 	}
 
 	// Always close output streams. Do not do this after Wait because if Start
@@ -468,15 +468,15 @@ func (c *Cmd) run(in io.Reader) {
 
 	// Set the runtime environment for the command as per os/exec.Cmd.  If Env
 	// is nil, use the current process' environment.
-	cmd.Env = c.Env
-	cmd.Dir = c.Dir
+	scmd.Env = c.Env
+	scmd.Dir = c.Dir
 
 	// Run all optional commands to customize underlying os/exe.Cmd.
 	for _, f := range c.beforeExecFuncs {
-		f(cmd)
+		f(scmd)
 
 		// Return early if Stop called
-		// https://github.com/go-cmd/cmd/issues/94
+		// https://github.com/kumose/xcmd/issues/94
 		c.Lock()
 		stopped := c.stopped
 		c.Unlock()
@@ -489,7 +489,7 @@ func (c *Cmd) run(in io.Reader) {
 	// Start command
 	// //////////////////////////////////////////////////////////////////////
 	now := time.Now()
-	if err := cmd.Start(); err != nil {
+	if err := scmd.Start(); err != nil {
 		c.Lock()
 		c.status.Error = err
 		c.status.StartTs = now.UnixNano()
@@ -501,8 +501,8 @@ func (c *Cmd) run(in io.Reader) {
 
 	// Set initial status
 	c.Lock()
-	c.startTime = now              // command is running
-	c.status.PID = cmd.Process.Pid // command is running
+	c.startTime = now               // command is running
+	c.status.PID = scmd.Process.Pid // command is running
 	c.status.StartTs = now.UnixNano()
 	c.started = true
 	c.Unlock()
@@ -510,7 +510,7 @@ func (c *Cmd) run(in io.Reader) {
 	// //////////////////////////////////////////////////////////////////////
 	// Wait for command to finish or be killed
 	// //////////////////////////////////////////////////////////////////////
-	err := cmd.Wait()
+	err := scmd.Wait()
 	now = time.Now()
 
 	// Get exit code of the command. According to the manual, Wait() returns:
@@ -560,7 +560,7 @@ func (c *Cmd) run(in io.Reader) {
 // Therefore, we can't read from the pipe in another goroutine because it
 // causes a race condition: we'll read in one goroutine and the original
 // goroutine that calls Wait will write on close which is what Wait does.
-// The proper solution is using an io.Writer for cmd.Stdout. I couldn't find
+// The proper solution is using an io.Writer for xcmd.Stdout. I couldn't find
 // an io.Writer that's also safe for concurrent reads (as lines in a []string
 // no less), so I created one:
 
@@ -574,9 +574,9 @@ func (c *Cmd) run(in io.Reader) {
 // a Go standard library os/exec.Command:
 //
 //	import "os/exec"
-//	import "github.com/go-cmd/cmd"
+//	import "github.com/kumose/xcmd"
 //	runnableCmd := exec.Command(...)
-//	stdout := cmd.NewOutputBuffer()
+//	stdout := xcmd.NewOutputBuffer()
 //	runnableCmd.Stdout = stdout
 //
 // While runnableCmd is running, call stdout.Lines() to read all output
@@ -666,7 +666,7 @@ func (e ErrLineBufferOverflow) Error() string {
 // OutputStream directly with a Go standard library os/exec.Command:
 //
 //	import "os/exec"
-//	import "github.com/go-cmd/cmd"
+//	import "github.com/kumose/xcmd"
 //
 //	stdoutChan := make(chan string, 100)
 //	go func() {
@@ -676,7 +676,7 @@ func (e ErrLineBufferOverflow) Error() string {
 //	}()
 //
 //	runnableCmd := exec.Command(...)
-//	stdout := cmd.NewOutputStream(stdoutChan)
+//	stdout := xcmd.NewOutputStream(stdoutChan)
 //	runnableCmd.Stdout = stdout
 //
 // While runnableCmd is running, lines are sent to the channel as soon as they

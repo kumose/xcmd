@@ -6,18 +6,18 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-cmd/cmd"
+	"github.com/kumose/xcmd"
 )
 
 func main() {
 	// Disable output buffering, enable streaming
-	cmdOptions := cmd.Options{
+	cmdOptions := xcmd.Options{
 		Buffered:  false,
 		Streaming: true,
 	}
 
 	// Create Cmd with options
-	envCmd := cmd.NewCmdOptions(cmdOptions, "./print-some-lines")
+	envCmd := xcmd.NewCmdOptions(cmdOptions, "./print-some-lines")
 
 	// Print STDOUT and STDERR lines streaming from Cmd
 	doneChan := make(chan struct{})

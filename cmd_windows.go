@@ -1,4 +1,4 @@
-package cmd
+package xcmd
 
 import (
 	"os"
@@ -18,6 +18,6 @@ func terminateProcess(pid int) error {
 	return p.Kill()
 }
 
-func setProcessGroupID(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
+func setProcessGroupID(scmd *exec.Cmd) {
+	scmd.SysProcAttr = &syscall.SysProcAttr{}
 }

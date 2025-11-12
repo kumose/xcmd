@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 
-	"github.com/go-cmd/cmd"
+	"github.com/kumose/xcmd"
 )
 
 func main() {
 	// Create Cmd, buffered output
-	envCmd := cmd.NewCmd("env")
+	envCmd := xcmd.NewCmd("env")
 
 	// Run and wait for Cmd to return Status
 	status := <-envCmd.Start()
